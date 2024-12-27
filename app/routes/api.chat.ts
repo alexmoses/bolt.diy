@@ -1,5 +1,4 @@
 import { type ActionFunctionArgs } from '@remix-run/cloudflare';
-import { createDataStream } from 'ai';
 import { MAX_RESPONSE_SEGMENTS, MAX_TOKENS } from '~/lib/.server/llm/constants';
 import { CONTINUE_PROMPT } from '~/lib/common/prompts/prompts';
 import { streamText, type Messages, type StreamingOptions } from '~/lib/.server/llm/stream-text';
@@ -64,18 +63,26 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         if (finishReason !== 'length') {
           return stream
             .switchSource(
-              createDataStream({
-                async execute(dataStream) {
-                  dataStream.writeMessageAnnotation({
-                    type: 'usage',
-                    value: {
-                      completionTokens: cumulativeUsage.completionTokens,
-                      promptTokens: cumulativeUsage.promptTokens,
-                      totalTokens: cumulativeUsage.totalTokens,
-                    },
-                  });
+              new ReadableStream({
+                async start(controller: ReadableStreamDefaultController) {
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      JSON.stringify(
+                        {
+                          type: 'usage',
+                          value: {
+                            completionTokens: cumulativeUsage.completionTokens,
+                            promptTokens: cumulativeUsage.promptTokens,
+                            totalTokens: cumulativeUsage.totalTokens,
+                          },
+                        },
+                        null,
+                        2,
+                      ),
+                    ),
+                  );
+                  controller.close();
                 },
-                onError: (error: any) => `Custom error: ${error.message}`,
               }),
             )
             .then(() => stream.close());

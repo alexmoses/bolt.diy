@@ -46,7 +46,7 @@ export default class OllamaProvider extends BaseProvider {
     serverEnv: Record<string, string> = {},
   ): Promise<ModelInfo[]> {
     try {
-      const { baseUrl } = this.getProviderBaseUrlAndKey({
+      let { baseUrl } = this.getProviderBaseUrlAndKey({
         apiKeys,
         providerSettings: settings,
         serverEnv,
@@ -57,6 +57,12 @@ export default class OllamaProvider extends BaseProvider {
       if (!baseUrl) {
         return [];
       }
+
+      // Backend: Check if we're running in Docker
+      const isDocker = process.env.RUNNING_IN_DOCKER === 'true';
+
+      baseUrl = isDocker ? baseUrl.replace('localhost', 'host.docker.internal') : baseUrl;
+      baseUrl = isDocker ? baseUrl.replace('127.0.0.1', 'host.docker.internal') : baseUrl;
 
       const response = await fetch(`${baseUrl}/api/tags`);
       const data = (await response.json()) as OllamaApiResponse;
